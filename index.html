@@ -30,7 +30,7 @@
     </div>
 
     <div class="buzzer-screen" id="gameplay">
-        <button class="buzzer-btn" id="buzz-button" onclick="pressBuzzer()">BUZZ</button>
+        <button class="buzzer-btn" id="buzz-button" onclick="pressBuzzer()" disabled>BUZZ</button>
         <div class="status" id="status-text">Connecting...</div>
     </div>
 
@@ -61,6 +61,11 @@ function joinGame() {
     teamName = input;
     document.getElementById('setup').style.display = 'none';
     document.getElementById('gameplay').style.display = 'flex';
+    
+    // Explicit safety lock immediately when moving to the buzzer layout view
+    const btn = document.getElementById('buzz-button');
+    btn.disabled = true; 
+    
     document.getElementById('status-text').innerText = "Connecting...";
     
     try {
@@ -74,7 +79,6 @@ function joinGame() {
 
         client.on('message', (topic, message) => {
             const msg = JSON.parse(message.toString());
-            const btn = document.getElementById('buzz-button');
             const status = document.getElementById('status-text');
             const myNormalName = teamName.trim().toLowerCase();
 
@@ -106,7 +110,7 @@ function joinGame() {
                 submitFJAnswer();
                 document.getElementById('fj-answer-workspace').style.display = 'none';
                 document.getElementById('gameplay').style.display = 'flex';
-                document.getElementById('buzz-button').disabled = true;
+                btn.disabled = true;
                 status.innerText = "Time expired! Checking scores...";
                 status.style.color = "#d9534f";
             }
@@ -115,7 +119,8 @@ function joinGame() {
 }
 
 function pressBuzzer() {
-    if (client && client.connected) {
+    const btn = document.getElementById('buzz-button');
+    if (client && client.connected && !btn.disabled) {
         client.publish(`${roomId}/buzz`, JSON.stringify({ team: teamName }));
     }
 }

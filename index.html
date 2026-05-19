@@ -107,8 +107,8 @@ function joinGame() {
                 document.getElementById('fj-answer-workspace').style.display = 'none';
                 document.getElementById('gameplay').style.display = 'flex';
                 document.getElementById('buzz-button').disabled = true;
-                document.getElementById('status-text').innerText = "Time expired! Checking scores...";
-                document.getElementById('status-text').style.color = "#d9534f";
+                status.innerText = "Time expired! Checking scores...";
+                status.style.color = "#d9534f";
             }
         });
     } catch (e) { alert("Setup failed: " + e.message); }

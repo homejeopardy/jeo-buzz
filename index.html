@@ -17,7 +17,6 @@
         .buzzer-btn:disabled { background: #555 !important; border-color: #333 !important; box-shadow: none !important; transform: none !important; }
         .status { margin-top: 30px; font-size: 20px; font-weight: bold; color: #f0ad4e; text-align: center; max-width: 90%; }
 
-        /* Final Jeopardy Mobile Workspace Panels */
         .fj-modal-panel { display: none; flex-direction: column; gap: 15px; width: 100%; max-width: 320px; background: #1e1e1e; padding: 25px; border-radius: 12px; border: 2px solid #e67e22; box-sizing: border-box; text-align: center; }
         textarea { resize: none; height: 80px; text-align: left; font-family: sans-serif; }
     </style>
@@ -69,8 +68,6 @@ function joinGame() {
         
         client.on('connect', () => {
             document.getElementById('status-text').innerText = "Registered! Waiting for host...";
-            
-            // Auto-registers the team on the host dashboard dynamically
             client.publish(`${roomId}/register`, JSON.stringify({ team: teamName }));
             client.subscribe(`${roomId}/system`);
         });
@@ -97,7 +94,6 @@ function joinGame() {
                 }
             }
 
-            // --- FINAL JEOPARDY WORKFLOW HANDLERS ---
             if (msg.type === "FJ_PROMPT_WAGERS") {
                 document.getElementById('gameplay').style.display = 'none';
                 document.getElementById('fj-wager-workspace').style.display = 'flex';
@@ -107,7 +103,6 @@ function joinGame() {
                 document.getElementById('fj-answer-workspace').style.display = 'flex';
             }
             if (msg.type === "FJ_TIMEOUT") {
-                // Auto-submits whatever text they currently have typed when time runs out
                 submitFJAnswer();
                 document.getElementById('fj-answer-workspace').style.display = 'none';
                 document.getElementById('gameplay').style.display = 'flex';

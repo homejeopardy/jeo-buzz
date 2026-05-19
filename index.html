@@ -62,7 +62,6 @@ function joinGame() {
     document.getElementById('setup').style.display = 'none';
     document.getElementById('gameplay').style.display = 'flex';
     
-    // Explicit safety lock immediately when moving to the buzzer layout view
     const btn = document.getElementById('buzz-button');
     btn.disabled = true; 
     
@@ -89,7 +88,7 @@ function joinGame() {
             if(msg.type === "UNLOCK_BUZZERS") {
                 if (msg.burned && msg.burned.includes(myNormalName)) {
                     btn.disabled = true;
-                    status.innerText = "❌ OUT FOR THIS CLUE";
+                    status.innerText = "OUT FOR THIS CLUE";
                     status.style.color = "#d9534f";
                 } else {
                     btn.disabled = false;
@@ -130,7 +129,7 @@ function submitFJWager() {
     if (client && client.connected) {
         client.publish(`${roomId}/fj_submit`, JSON.stringify({ team: teamName, wager: wagerVal }));
     }
-    document.getElementById('fj-wager-workspace').innerHTML = `<h3>Wager Saved 🔒</h3><p>Waiting for host to reveal clue...</p>`;
+    document.getElementById('fj-wager-workspace').innerHTML = `<h3>Wager Saved</h3><p>Waiting for host to reveal clue...</p>`;
 }
 
 function submitFJAnswer() {
@@ -138,7 +137,7 @@ function submitFJAnswer() {
     if (client && client.connected) {
         client.publish(`${roomId}/fj_submit`, JSON.stringify({ team: teamName, answer: answerVal || "No Answer Submitted" }));
     }
-    document.getElementById('fj-answer-workspace').innerHTML = `<h3>Response Logged 🔒</h3><p>Look at host display...</p>`;
+    document.getElementById('fj-answer-workspace').innerHTML = `<h3>Response Logged</h3><p>Look at host display...</p>`;
 }
 </script>
 </body>

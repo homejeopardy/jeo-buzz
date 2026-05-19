@@ -149,7 +149,6 @@ function submitFJElement() {
     }
     mqttClient.publish(`${roomId}/fj_submit`, JSON.stringify(payload));
     
-    // UI state safety cleanup to stop player confusion
     document.getElementById('fj-submit-btn').disabled = true;
     document.getElementById('fj-prompt-lbl').innerText = "SUBMISSION LOCKED - WAITING ON HOST";
     document.getElementById('fj-console').style.display = "none"; 

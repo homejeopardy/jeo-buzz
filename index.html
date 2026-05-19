@@ -2,142 +2,207 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeopardy Buzzer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jeopardy - Player Buzzer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <style>
-        body { font-family: 'Arial', sans-serif; background: #111; color: white; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; box-sizing: border-box; padding: 20px; }
-        .setup-screen { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 300px; text-align: center; }
-        input, textarea { padding: 15px; font-size: 18px; border-radius: 8px; border: 2px solid #555; background: #222; color: white; text-align: center; }
-        button.start-btn { background: #27ae60; color: white; border: none; padding: 15px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        /* Lock screen viewport to eliminate accidental browser bouncing/scrolling */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #11111a; color: #e2e8f0; margin: 0; padding: 20px; box-sizing: border-box; height: 100vh; width: 100vw; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
         
-        .buzzer-screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; }
-        .buzzer-btn { width: 80vw; height: 80vw; max-width: 300px; max-height: 300px; background: #d9534f; border: 8px solid #962d2a; border-radius: 50%; color: white; font-size: 28px; font-weight: bold; cursor: pointer; box-shadow: 0 10px 0 #732220, 0 15px 20px rgba(0,0,0,0.5); -webkit-tap-highlight-color: transparent; }
-        .buzzer-btn:active { transform: translateY(8px); box-shadow: 0 2px 0 #732220, 0 5px 10px rgba(0,0,0,0.5); background: #c9302c; }
-        .buzzer-btn:disabled { background: #555 !important; border-color: #333 !important; box-shadow: none !important; transform: none !important; }
-        .status { margin-top: 30px; font-size: 20px; font-weight: bold; color: #f0ad4e; text-align: center; max-width: 90%; }
+        /* Registration HUD block */
+        .setup-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; max-width: 400px; margin: auto; gap: 15px; }
+        .input-field { width: 100%; padding: 16px; font-size: 18px; border-radius: 8px; border: 2px solid #2d2d44; background: #1e1e2f; color: white; box-sizing: border-box; text-align: center; }
+        .reg-btn { width: 100%; padding: 16px; font-size: 18px; font-weight: bold; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        
+        /* Game Interface Screen */
+        .game-screen { display: none; flex-direction: column; align-items: center; justify-content: space-between; width: 100%; height: 100%; box-sizing: border-box; }
+        
+        /* Score Cash Vault Header Display */
+        .score-header { background: #1e1e2f; border: 2px solid #2d2d44; border-radius: 12px; width: 100%; max-width: 450px; padding: 12px; text-align: center; box-sizing: border-box; }
+        .team-title { font-size: 16px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 4px; }
+        .points-display { font-size: 32px; font-weight: bold; color: #4ade80; font-family: 'Courier New', Courier, monospace; }
 
-        .fj-modal-panel { display: none; flex-direction: column; gap: 15px; width: 100%; max-width: 320px; background: #1e1e1e; padding: 25px; border-radius: 12px; border: 2px solid #e67e22; box-sizing: border-box; text-align: center; }
-        textarea { resize: none; height: 80px; text-align: left; font-family: sans-serif; }
+        /* Final Jeopardy Betting Layout Overlay Box */
+        .fj-input-box { display: none; background: #1e1e2f; border: 2px solid #f97316; border-radius: 12px; width: 100%; max-width: 450px; padding: 15px; text-align: center; box-sizing: border-box; margin: 10px 0; }
+        .fj-status-text { font-size: 14px; color: #f97316; font-weight: bold; text-transform: uppercase; margin-bottom: 8px; }
+
+        /* ADVANCED HIGH-PERFORMANCE MOBILE BUZZER PAD */
+        .buzzer-pad { width: 100%; max-width: 450px; aspect-ratio: 1/1; background: radial-gradient(circle, #dc2626 0%, #991b1b 100%); border: 10px solid #7f1d1d; border-radius: 50%; box-shadow: 0 10px 25px rgba(0,0,0,0.6), inset 0 4px 10px rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 28px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin: auto; transition: transform 0.1s ease;
+            
+            /* CRITICAL: Disables mobile gesture engine completely on this dome to eliminate scrolling lag */
+            touch-action: none; 
+            -webkit-user-select: none; 
+            user-select: none; 
+        }
+        .buzzer-pad:active { transform: scale(0.96); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        .buzzer-pad.locked { background: #3d3d54 !important; border-color: #2d2d3d !important; color: #71718a !important; cursor: not-allowed; text-shadow: none; box-shadow: none; }
     </style>
 </head>
 <body>
 
-    <div class="setup-screen" id="setup">
-        <h2>Enter Team Name</h2>
-        <input type="text" id="team-input" placeholder="e.g., Team Alpha" maxlength="15">
-        <button class="start-btn" id="join-btn" onclick="joinGame()">Join Game</button>
+    <div class="setup-screen" id="view-setup">
+        <h2 style="text-align: center; color: #f0ad4e; margin: 0;">Join the Game</h2>
+        <input type="text" class="input-field" id="team-input" placeholder="ENTER TEAM NAME" autocomplete="off" maxlength="15">
+        <button class="reg-btn" onclick="registerTeamName()">CONNECT DEVICE</button>
     </div>
 
-    <div class="buzzer-screen" id="gameplay">
-        <button class="buzzer-btn" id="buzz-button" onclick="pressBuzzer()" disabled>BUZZ</button>
-        <div class="status" id="status-text">Connecting...</div>
-    </div>
+    <div class="game-screen" id="view-game">
+        <div class="score-header">
+            <div class="team-title" id="display-team-lbl">TEAM</div>
+            <div class="points-display" id="display-points-val">$0</div>
+        </div>
 
-    <div class="fj-modal-panel" id="fj-wager-workspace">
-        <h2 style="color: #e67e22; margin:0;">Final Jeopardy</h2>
-        <p>Enter your wager tokens:</p>
-        <input type="number" id="fj-wager-input" placeholder="Wager amount..." min="0">
-        <button class="start-btn" onclick="submitFJWager()">Lock In Wager</button>
-    </div>
+        <div class="fj-input-box" id="fj-console">
+            <div class="fj-status-text" id="fj-prompt-lbl">Wager Screen Active</div>
+            <input type="text" class="input-field" id="fj-val-input" placeholder="Enter Value..." autocomplete="off">
+            <button class="reg-btn" style="background: #f97316; margin-top: 10px;" id="fj-submit-btn" onclick="submitFJElement()">SUBMIT TO HOST</button>
+        </div>
 
-    <div class="fj-modal-panel" id="fj-answer-workspace">
-        <h2 style="color: #e67e22; margin:0;">Clue Active!</h2>
-        <p>Type your answer:</p>
-        <textarea id="fj-answer-input" placeholder="What is..."></textarea>
-        <button class="start-btn" style="background:#0275d8;" onclick="submitFJAnswer()">Submit Response</button>
+        <div class="buzzer-pad" id="buzz-dome">BUZZ</div>
+        
+        <div style="height: 10px;"></div>
     </div>
 
 <script>
-let client;
-let teamName = "";
-const roomId = "family_jeopardy_2026"; 
+const roomId = "family_jeopardy_2026";
+const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+const bc = new BroadcastChannel('jeopardy_game');
 
-function joinGame() {
-    const input = document.getElementById('team-input').value.trim();
-    if(!input) return alert("Please enter a name!");
-    if (typeof mqtt === 'undefined') return alert("Network driver error!");
+let myTeamName = "";
+let currentScorePool = 0;
+let amILockedOut = true;
+let currentFJMode = ""; // Tracks if current input is "WAGER" or "ANSWER"
 
-    teamName = input;
-    document.getElementById('setup').style.display = 'none';
-    document.getElementById('gameplay').style.display = 'flex';
+mqttClient.on('connect', () => {
+    mqttClient.subscribe(`${roomId}/system`);
+});
+
+mqttClient.on('message', (topic, message) => {
+    const data = JSON.parse(message.toString());
+
+    // Master Buzzer Override Lock States Sent from Host Console
+    if (data.type === "LOCK_BUZZERS") {
+        setBuzzerLockState(true, data.reason || "LOCKED");
+    }
+
+    if (data.type === "UNLOCK_BUZZERS") {
+        const lowerBurnedList = (data.burned || []).map(name => name.trim().toLowerCase());
+        if (lowerBurnedList.includes(myTeamName.toLowerCase())) {
+            setBuzzerLockState(true, "LOCKED");
+        } else {
+            setBuzzerLockState(false, "BUZZ NOW");
+        }
+    }
+
+    // Final Jeopardy Phase Handlers
+    if (data.type === "FJ_PROMPT_WAGERS") {
+        document.getElementById('buzz-dome').style.display = "none";
+        const consoleBox = document.getElementById('fj-console');
+        consoleBox.style.display = "block";
+        document.getElementById('fj-prompt-lbl').innerText = "ENTER YOUR WAGER (Max: $" + currentScorePool + ")";
+        document.getElementById('fj-val-input').value = "";
+        document.getElementById('fj-val-input').placeholder = "Wager amount...";
+        document.getElementById('fj-submit-btn').disabled = false;
+        currentFJMode = "WAGER";
+    }
+
+    if (data.type === "FJ_PROMPT_ANSWERS") {
+        const consoleBox = document.getElementById('fj-console');
+        consoleBox.style.display = "block";
+        document.getElementById('fj-prompt-lbl').innerText = "ENTER FINAL ANSWER";
+        document.getElementById('fj-val-input').value = "";
+        document.getElementById('fj-val-input').placeholder = "Who/What is...";
+        document.getElementById('fj-submit-btn').disabled = false;
+        currentFJMode = "ANSWER";
+    }
+
+    if (data.type === "FJ_TIMEOUT") {
+        document.getElementById('fj-submit-btn').disabled = true;
+        document.getElementById('fj-prompt-lbl').innerText = "TIME EXPIRED - LOCKED OUT";
+    }
+});
+
+// Intercept scoreboard update broadcasts from the main screen to keep cash values synchronized
+bc.onmessage = function(ev) {
+    if (ev.data.type === 'UPDATE_TEAMS' && myTeamName !== "") {
+        const matchingData = ev.data.teams.find(t => t.name.toLowerCase() === myTeamName.toLowerCase());
+        if (matchingData) {
+            currentScorePool = matchingData.score;
+            
+            // Format string explicitly as requested into $___ template layout
+            document.getElementById('display-points-val').innerText = (currentScorePool < 0) ? `-$${Math.abs(currentScorePool)}` : `$${currentScorePool}`;
+        }
+    }
+};
+
+function registerTeamName() {
+    const raw = document.getElementById('team-input').value.trim();
+    if (raw === "") return;
+
+    myTeamName = raw;
+    document.getElementById('display-team-lbl').innerText = myTeamName.toUpperCase();
     
-    const btn = document.getElementById('buzz-button');
-    btn.disabled = true; 
+    // Announce device registration message up to processing layers
+    mqttClient.publish(`${roomId}/register`, JSON.stringify({ team: myTeamName }));
+
+    // Switch card UI frames
+    document.getElementById('view-setup').style.display = "none";
+    document.getElementById('view-game').style.display = "flex";
     
-    document.getElementById('status-text').innerText = "Connecting...";
-    
-    try {
-        client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
-        
-        client.on('connect', () => {
-            document.getElementById('status-text').innerText = "Registered! Waiting for host...";
-            client.publish(`${roomId}/register`, JSON.stringify({ team: teamName }));
-            client.subscribe(`${roomId}/system`);
-        });
-
-        client.on('message', (topic, message) => {
-            const msg = JSON.parse(message.toString());
-            const status = document.getElementById('status-text');
-            const myNormalName = teamName.trim().toLowerCase();
-
-            if(msg.type === "LOCK_BUZZERS") {
-                btn.disabled = true;
-                status.innerText = msg.reason || "Locked";
-            }
-            if(msg.type === "UNLOCK_BUZZERS") {
-                if (msg.burned && msg.burned.includes(myNormalName)) {
-                    btn.disabled = true;
-                    status.innerText = "OUT FOR THIS CLUE";
-                    status.style.color = "#d9534f";
-                } else {
-                    btn.disabled = false;
-                    status.innerText = "BUZZER ACTIVE! GO!";
-                    status.style.color = "#f0ad4e";
-                }
-            }
-
-            if (msg.type === "FJ_PROMPT_WAGERS") {
-                document.getElementById('gameplay').style.display = 'none';
-                document.getElementById('fj-wager-workspace').style.display = 'flex';
-            }
-            if (msg.type === "FJ_PROMPT_ANSWERS") {
-                document.getElementById('fj-wager-workspace').style.display = 'none';
-                document.getElementById('fj-answer-workspace').style.display = 'flex';
-            }
-            if (msg.type === "FJ_TIMEOUT") {
-                submitFJAnswer();
-                document.getElementById('fj-answer-workspace').style.display = 'none';
-                document.getElementById('gameplay').style.display = 'flex';
-                btn.disabled = true;
-                status.innerText = "Time expired! Checking scores...";
-                status.style.color = "#d9534f";
-            }
-        });
-    } catch (e) { alert("Setup failed: " + e.message); }
+    // Request current teams list to retrieve existing scores immediately
+    bc.postMessage({ type: 'REQUEST_TEAMS' });
 }
 
-function pressBuzzer() {
-    const btn = document.getElementById('buzz-button');
-    if (client && client.connected && !btn.disabled) {
-        client.publish(`${roomId}/buzz`, JSON.stringify({ team: teamName }));
+function setBuzzerLockState(shouldLock, narrativeLabel) {
+    amILockedOut = shouldLock;
+    const dome = document.getElementById('buzz-dome');
+    dome.innerText = narrativeLabel;
+    if (shouldLock) {
+        dome.classList.add('locked');
+    } else {
+        dome.classList.remove('locked');
     }
 }
 
-function submitFJWager() {
-    const wagerVal = document.getElementById('fj-wager-input').value;
-    if (client && client.connected) {
-        client.publish(`${roomId}/fj_submit`, JSON.stringify({ team: teamName, wager: wagerVal }));
-    }
-    document.getElementById('fj-wager-workspace').innerHTML = `<h3>Wager Saved</h3><p>Waiting for host to reveal clue...</p>`;
+// EXECUTE ACTIVE BUZZ FUNCTION
+function performGenericBuzzerStrike() {
+    if (amILockedOut || myTeamName === "") return;
+    
+    // Fire event packet instantly up to network broker
+    mqttClient.publish(`${roomId}/buzz`, JSON.stringify({ team: myTeamName }));
+    setBuzzerLockState(true, "SENT...");
 }
 
-function submitFJAnswer() {
-    const answerVal = document.getElementById('fj-answer-input').value;
-    if (client && client.connected) {
-        client.publish(`${roomId}/fj_submit`, JSON.stringify({ team: teamName, answer: answerVal || "No Answer Submitted" }));
+// MOBILE REACTION TRIGGER: Binds to touchstart to outrun scrolling engine loops entirely
+const domeElement = document.getElementById('buzz-dome');
+domeElement.addEventListener('touchstart', function(e) {
+    e.preventDefault(); // Disables secondary simulation clicks inside standard webviews
+    performGenericBuzzerStrike();
+}, { passive: false });
+
+// Fallback listener click support wrapper for desktop browser testing
+domeElement.addEventListener('mousedown', function(e) {
+    performGenericBuzzerStrike();
+});
+
+function submitFJElement() {
+    const fieldVal = document.getElementById('fj-val-input').value.trim();
+    if (fieldVal === "") return;
+
+    let payload = { team: myTeamName };
+    if (currentFJMode === "WAGER") {
+        let numericWager = parseInt(fieldVal) || 0;
+        // Keep wager strictly within standard compliance limits
+        if (numericWager < 0) numericWager = 0;
+        if (numericWager > currentScorePool && currentScorePool > 0) numericWager = currentScorePool;
+        payload.wager = numericWager;
+    } else if (currentFJMode === "ANSWER") {
+        payload.answer = fieldVal;
     }
-    document.getElementById('fj-answer-workspace').innerHTML = `<h3>Response Logged</h3><p>Look at host display...</p>`;
+
+    mqttClient.publish(`${roomId}/fj_submit`, JSON.stringify(payload));
+    document.getElementById('fj-submit-btn').disabled = true;
+    document.getElementById('fj-prompt-lbl').innerText = "SUBMISSION LOCKED";
 }
 </script>
 </body>

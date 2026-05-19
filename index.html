@@ -50,7 +50,6 @@ function joinGame() {
     document.getElementById('status-text').innerText = "Connecting...";
     
     try {
-        // Switched to a standard public EMQX secure websocket address which phones do not block
         client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
         
         client.on('connect', () => {
@@ -60,21 +59,29 @@ function joinGame() {
 
         client.on('error', (err) => {
             document.getElementById('status-text').innerText = "Retry connection...";
-            console.log(err);
         });
 
         client.on('message', (topic, message) => {
             const msg = JSON.parse(message.toString());
             const btn = document.getElementById('buzz-button');
             const status = document.getElementById('status-text');
+            const myNormalName = teamName.trim().toLowerCase();
 
             if(msg.type === "LOCK_BUZZERS") {
                 btn.disabled = true;
                 status.innerText = msg.reason || "Locked";
             }
             if(msg.type === "UNLOCK_BUZZERS") {
-                btn.disabled = false;
-                status.innerText = "BUZZER ACTIVE! GO!";
+                // If this phone's name matches a burned team on the host list, lock it out permanently
+                if (msg.burned && msg.burned.includes(myNormalName)) {
+                    btn.disabled = true;
+                    status.innerText = "❌ OUT FOR THIS CLUE";
+                    status.style.color = "#d9534f";
+                } else {
+                    btn.disabled = false;
+                    status.innerText = "BUZZER ACTIVE! GO!";
+                    status.style.color = "#f0ad4e";
+                }
             }
         });
     } catch (e) {

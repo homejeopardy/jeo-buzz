@@ -8,27 +8,45 @@
     <style>
         body { font-family: 'Arial', sans-serif; background: #111; color: white; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; box-sizing: border-box; padding: 20px; }
         .setup-screen { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 300px; text-align: center; }
-        input { padding: 15px; font-size: 18px; border-radius: 8px; border: 2px solid #555; background: #222; color: white; text-align: center; }
+        input, textarea { padding: 15px; font-size: 18px; border-radius: 8px; border: 2px solid #555; background: #222; color: white; text-align: center; }
         button.start-btn { background: #27ae60; color: white; border: none; padding: 15px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; }
         
         .buzzer-screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; }
         .buzzer-btn { width: 80vw; height: 80vw; max-width: 300px; max-height: 300px; background: #d9534f; border: 8px solid #962d2a; border-radius: 50%; color: white; font-size: 28px; font-weight: bold; cursor: pointer; box-shadow: 0 10px 0 #732220, 0 15px 20px rgba(0,0,0,0.5); -webkit-tap-highlight-color: transparent; }
         .buzzer-btn:active { transform: translateY(8px); box-shadow: 0 2px 0 #732220, 0 5px 10px rgba(0,0,0,0.5); background: #c9302c; }
-        .buzzer-btn:disabled { background: #555 !important; border-color: #333 !important; box-shadow: none !important; transform: none !important; cursor: not-allowed; }
-        .status { margin-top: 30px; font-size: 20px; font-weight: bold; color: #f0ad4e; text-align: center; max-width: 90%; word-wrap: break-word; }
+        .buzzer-btn:disabled { background: #555 !important; border-color: #333 !important; box-shadow: none !important; transform: none !important; }
+        .status { margin-top: 30px; font-size: 20px; font-weight: bold; color: #f0ad4e; text-align: center; max-width: 90%; }
+
+        /* Final Jeopardy Mobile Workspace Panels */
+        .fj-modal-panel { display: none; flex-direction: column; gap: 15px; width: 100%; max-width: 320px; background: #1e1e1e; padding: 25px; border-radius: 12px; border: 2px solid #e67e22; box-sizing: border-box; text-align: center; }
+        textarea { resize: none; height: 80px; text-align: left; font-family: sans-serif; }
     </style>
 </head>
 <body>
 
     <div class="setup-screen" id="setup">
         <h2>Enter Team Name</h2>
-        <input type="text" id="team-input" placeholder="e.g., Team 1" maxlength="15">
+        <input type="text" id="team-input" placeholder="e.g., Team Alpha" maxlength="15">
         <button class="start-btn" id="join-btn" onclick="joinGame()">Join Game</button>
     </div>
 
     <div class="buzzer-screen" id="gameplay">
         <button class="buzzer-btn" id="buzz-button" onclick="pressBuzzer()">BUZZ</button>
         <div class="status" id="status-text">Connecting...</div>
+    </div>
+
+    <div class="fj-modal-panel" id="fj-wager-workspace">
+        <h2 style="color: #e67e22; margin:0;">Final Jeopardy</h2>
+        <p>Enter your wager tokens:</p>
+        <input type="number" id="fj-wager-input" placeholder="Wager amount..." min="0">
+        <button class="start-btn" onclick="submitFJWager()">Lock In Wager</button>
+    </div>
+
+    <div class="fj-modal-panel" id="fj-answer-workspace">
+        <h2 style="color: #e67e22; margin:0;">Clue Active!</h2>
+        <p>Type your answer:</p>
+        <textarea id="fj-answer-input" placeholder="What is..."></textarea>
+        <button class="start-btn" style="background:#0275d8;" onclick="submitFJAnswer()">Submit Response</button>
     </div>
 
 <script>
@@ -39,10 +57,7 @@ const roomId = "family_jeopardy_2026";
 function joinGame() {
     const input = document.getElementById('team-input').value.trim();
     if(!input) return alert("Please enter a name!");
-    
-    if (typeof mqtt === 'undefined') {
-        return alert("Network driver missing! Check phone internet connection.");
-    }
+    if (typeof mqtt === 'undefined') return alert("Network driver error!");
 
     teamName = input;
     document.getElementById('setup').style.display = 'none';
@@ -53,12 +68,11 @@ function joinGame() {
         client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
         
         client.on('connect', () => {
-            document.getElementById('status-text').innerText = "Connected! Waiting for host...";
+            document.getElementById('status-text').innerText = "Registered! Waiting for host...";
+            
+            // Auto-registers the team on the host dashboard dynamically
+            client.publish(`${roomId}/register`, JSON.stringify({ team: teamName }));
             client.subscribe(`${roomId}/system`);
-        });
-
-        client.on('error', (err) => {
-            document.getElementById('status-text').innerText = "Retry connection...";
         });
 
         client.on('message', (topic, message) => {
@@ -72,7 +86,6 @@ function joinGame() {
                 status.innerText = msg.reason || "Locked";
             }
             if(msg.type === "UNLOCK_BUZZERS") {
-                // If this phone's name matches a burned team on the host list, lock it out permanently
                 if (msg.burned && msg.burned.includes(myNormalName)) {
                     btn.disabled = true;
                     status.innerText = "❌ OUT FOR THIS CLUE";
@@ -83,16 +96,49 @@ function joinGame() {
                     status.style.color = "#f0ad4e";
                 }
             }
+
+            // --- FINAL JEOPARDY WORKFLOW HANDLERS ---
+            if (msg.type === "FJ_PROMPT_WAGERS") {
+                document.getElementById('gameplay').style.display = 'none';
+                document.getElementById('fj-wager-workspace').style.display = 'flex';
+            }
+            if (msg.type === "FJ_PROMPT_ANSWERS") {
+                document.getElementById('fj-wager-workspace').style.display = 'none';
+                document.getElementById('fj-answer-workspace').style.display = 'flex';
+            }
+            if (msg.type === "FJ_TIMEOUT") {
+                // Auto-submits whatever text they currently have typed when time runs out
+                submitFJAnswer();
+                document.getElementById('fj-answer-workspace').style.display = 'none';
+                document.getElementById('gameplay').style.display = 'flex';
+                document.getElementById('buzz-button').disabled = true;
+                document.getElementById('status-text').innerText = "Time expired! Checking scores...";
+                document.getElementById('status-text').style.color = "#d9534f";
+            }
         });
-    } catch (e) {
-        alert("Setup failed: " + e.message);
-    }
+    } catch (e) { alert("Setup failed: " + e.message); }
 }
 
 function pressBuzzer() {
     if (client && client.connected) {
         client.publish(`${roomId}/buzz`, JSON.stringify({ team: teamName }));
     }
+}
+
+function submitFJWager() {
+    const wagerVal = document.getElementById('fj-wager-input').value;
+    if (client && client.connected) {
+        client.publish(`${roomId}/fj_submit`, JSON.stringify({ team: teamName, wager: wagerVal }));
+    }
+    document.getElementById('fj-wager-workspace').innerHTML = `<h3>Wager Saved 🔒</h3><p>Waiting for host to reveal clue...</p>`;
+}
+
+function submitFJAnswer() {
+    const answerVal = document.getElementById('fj-answer-input').value;
+    if (client && client.connected) {
+        client.publish(`${roomId}/fj_submit`, JSON.stringify({ team: teamName, answer: answerVal || "No Answer Submitted" }));
+    }
+    document.getElementById('fj-answer-workspace').innerHTML = `<h3>Response Logged 🔒</h3><p>Look at host display...</p>`;
 }
 </script>
 </body>

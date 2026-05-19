@@ -62,7 +62,6 @@ mqttClient.on('connect', () => {
 mqttClient.on('message', (topic, message) => {
     const data = JSON.parse(message.toString());
 
-    // Score synchronization processing over internet topic channel
     if (topic === `${roomId}/scores_sync` && myTeamName !== "") {
         const matchingTeam = data.teams.find(t => t.name.toLowerCase() === myTeamName.toLowerCase());
         if (matchingTeam) {
@@ -85,11 +84,15 @@ mqttClient.on('message', (topic, message) => {
             document.getElementById('buzz-dome').style.display = "none";
             document.getElementById('fj-console').style.display = "block";
             document.getElementById('fj-prompt-lbl').innerText = "ENTER YOUR WAGER (Max: $" + currentScorePool + ")";
+            document.getElementById('fj-val-input').value = "";
+            document.getElementById('fj-submit-btn').disabled = false;
             currentFJMode = "WAGER";
         }
         if (data.type === "FJ_PROMPT_ANSWERS") {
             document.getElementById('fj-console').style.display = "block";
             document.getElementById('fj-prompt-lbl').innerText = "ENTER FINAL ANSWER";
+            document.getElementById('fj-val-input').value = "";
+            document.getElementById('fj-submit-btn').disabled = false;
             currentFJMode = "ANSWER";
         }
         if (data.type === "FJ_TIMEOUT") {
@@ -145,8 +148,11 @@ function submitFJElement() {
         payload.answer = fieldVal;
     }
     mqttClient.publish(`${roomId}/fj_submit`, JSON.stringify(payload));
+    
+    // UI state safety cleanup to stop player confusion
     document.getElementById('fj-submit-btn').disabled = true;
-    document.getElementById('fj-prompt-lbl').innerText = "SUBMISSION LOCKED";
+    document.getElementById('fj-prompt-lbl').innerText = "SUBMISSION LOCKED - WAITING ON HOST";
+    document.getElementById('fj-console').style.display = "none"; 
 }
 </script>
 </body>

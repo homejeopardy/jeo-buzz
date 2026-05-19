@@ -36,37 +36,31 @@ let client;
 let teamName = "";
 const roomId = "family_jeopardy_2026"; 
 
-// Absolute fallback tracker to find out exactly why a phone crashes
-window.onerror = function(msg, url, line) {
-    alert("Error: " + msg + "\nLine: " + line);
-    return false;
-};
-
 function joinGame() {
     const input = document.getElementById('team-input').value.trim();
     if(!input) return alert("Please enter a name!");
     
-    // Safety check to ensure library loaded properly on phone connection type
     if (typeof mqtt === 'undefined') {
-        return alert("The network driver couldn't load. Make sure your phone is connected to the internet!");
+        return alert("Network driver missing! Check phone internet connection.");
     }
 
     teamName = input;
     document.getElementById('setup').style.display = 'none';
     document.getElementById('gameplay').style.display = 'flex';
-    document.getElementById('status-text').innerText = "Connecting to Game Server...";
+    document.getElementById('status-text').innerText = "Connecting...";
     
     try {
-        // High-security configuration port link to bypass phone carrier restrictions
-        client = mqtt.connect('wss://broker.hivemq.com:8043/mqtt');
+        // Switched to a standard public EMQX secure websocket address which phones do not block
+        client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
         
         client.on('connect', () => {
-            document.getElementById('status-text').innerText = "Connected! Waiting for clue...";
+            document.getElementById('status-text').innerText = "Connected! Waiting for host...";
             client.subscribe(`${roomId}/system`);
         });
 
         client.on('error', (err) => {
-            document.getElementById('status-text').innerText = "Connection error: " + err.message;
+            document.getElementById('status-text').innerText = "Retry connection...";
+            console.log(err);
         });
 
         client.on('message', (topic, message) => {
@@ -84,7 +78,7 @@ function joinGame() {
             }
         });
     } catch (e) {
-        alert("Connection failure: " + e.message);
+        alert("Setup failed: " + e.message);
     }
 }
 
